@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Thank You, Team!</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -36,9 +37,7 @@
 
         <section class="mb-16">
             <h2 class="text-3xl font-bold text-center mb-10 text-gray-900">A Special Thanks to Each of You</h2>
-            
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-
                 <div class="bg-white rounded-xl shadow-md overflow-hidden transform transition-all duration-300 card-hover">
                     <div class="h-56 w-full overflow-hidden">
                         <img src="/pics/Minh.png" 
@@ -169,122 +168,127 @@
                         </p>
                     </div>
                 </div>
-                
             </div>
         </section>
 
         <section class="mt-16">
             <h2 class="text-3xl font-bold text-center mb-10 text-gray-900">Anonymous Confessions</h2>
-
             <div class="max-w-2xl mx-auto">
                 <form id="confession-form" class="bg-white p-6 rounded-xl shadow-md mb-8">
-                    <textarea id="confession-input" 
-                              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow duration-200" 
-                              rows="4" 
-                              placeholder="Share a final thought, a fun memory, or a secret message with the team..."></textarea>
-                    <button type="submit" 
-                            class="mt-4 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300">
+                    <textarea id="confession-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow duration-200" rows="4" placeholder="Share a final thought, a fun memory, or a secret message..."></textarea>
+                    <button type="submit" class="mt-4 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300">
                         Submit Anonymously
                     </button>
                 </form>
-
                 <div id="confessions-list" class="space-y-4">
                     </div>
             </div>
         </section>
+
         <footer class="text-center mt-16 py-6 border-t border-gray-200">
             <p class="text-gray-500">Made with ❤️ for the best team ever.</p>
         </footer>
-
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const confessionForm = document.getElementById('confession-form');
-            const confessionInput = document.getElementById('confession-input');
-            const confessionsList = document.getElementById('confessions-list');
+        // 1. PASTE YOUR SUPABASE URL AND ANON KEY HERE
+        const SUPABASE_URL = 'https://axwwcuugntiqusfpwpjn.supabase.co'; // e.g., 'https://xyz.supabase.co'
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4d3djdXVnbnRpcXVzZnB3cGpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MDc1MDQsImV4cCI6MjA2ODQ4MzUwNH0.HM86U578yQlfkBokJ6G9gV6_xP5yHrWcduzz2IJ67JM';
+
+        // --- You don't need to edit below this line ---
+
+        const { createClient } = supabase;
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const confessionForm = document.getElementById('confession-form');
+        const confessionInput = document.getElementById('confession-input');
+        const confessionsList = document.getElementById('confessions-list');
+
+        // Function to create and display a single confession box
+        const addConfessionToDOM = (confession) => {
+            const confessionBox = document.createElement('div');
+            // Use confession.id to prevent adding duplicates from the real-time listener
+            confessionBox.setAttribute('data-id', confession.id);
+            confessionBox.className = 'bg-white p-5 rounded-xl shadow-md animate-fade-in';
             
-            // The key used to store confessions in the browser's local storage
-            const storageKey = 'teamConfessions';
+            const confessionText = document.createElement('p');
+            confessionText.className = 'text-gray-700 italic';
+            confessionText.textContent = `"${confession.text}"`;
+            
+            confessionBox.appendChild(confessionText);
+            confessionsList.prepend(confessionBox);
+        };
+        
+        // Function to fetch all initial confessions from the database
+        const fetchInitialConfessions = async () => {
+            const { data, error } = await _supabase
+                .from('confessions')
+                .select('*')
+                .order('created_at', { ascending: false }); // Newest first
+            
+            if (error) {
+                console.error('Error fetching confessions:', error);
+            } else {
+                confessionsList.innerHTML = ''; // Clear list before loading
+                data.forEach(addConfessionToDOM);
+            }
+        };
 
-            // Function to get existing confessions from local storage
-            const getStoredConfessions = () => {
-                const confessions = localStorage.getItem(storageKey);
-                return confessions ? JSON.parse(confessions) : [];
-            };
+        // Handle the form submission to ADD a new confession
+        confessionForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = confessionInput.value.trim();
+            if (text) {
+                // Disable the form while submitting
+                confessionInput.disabled = true;
+                confessionForm.querySelector('button').disabled = true;
 
-            // Function to save confessions to local storage
-            const saveConfessions = (confessions) => {
-                localStorage.setItem(storageKey, JSON.stringify(confessions));
-            };
-
-            // Function to create and display a single confession box on the page
-            const addConfessionToDOM = (text) => {
-                const confessionBox = document.createElement('div');
-                confessionBox.className = 'bg-white p-5 rounded-xl shadow-md animate-fade-in';
+                const { error } = await _supabase
+                    .from('confessions')
+                    .insert([{ text: text }]);
                 
-                const confessionText = document.createElement('p');
-                confessionText.className = 'text-gray-700 italic';
-                confessionText.textContent = `"${text}"`;
-                
-                confessionBox.appendChild(confessionText);
-
-                // Add the new confession to the top of the list
-                confessionsList.prepend(confessionBox);
-            };
-
-            // Load and display any previously saved confessions when the page loads
-            const loadConfessions = () => {
-                const storedConfessions = getStoredConfessions();
-                // Clear any existing list items to prevent duplicates on error
-                confessionsList.innerHTML = ''; 
-                // Display them in reverse order so newest are on top
-                storedConfessions.reverse().forEach(confession => {
-                    addConfessionToDOM(confession.text);
-                });
-            };
-
-            // Handle the form submission
-            confessionForm.addEventListener('submit', (e) => {
-                e.preventDefault(); // Prevent the page from reloading
-
-                const text = confessionInput.value.trim();
-
-                if (text) {
-                    // 1. Display the new confession immediately
-                    addConfessionToDOM(text);
-
-                    // 2. Save the new confession to local storage
-                    const storedConfessions = getStoredConfessions();
-                    const newConfession = {
-                        text: text,
-                        date: new Date().toISOString() // Store date for potential future use
-                    };
-                    storedConfessions.push(newConfession);
-                    saveConfessions(storedConfessions);
-
-                    // 3. Clear the input field
+                if (error) {
+                    console.error('Error sending confession:', error);
+                    alert("Sorry, couldn't send your message. Please try again.");
+                } else {
+                    // The real-time listener will add the confession to the DOM.
                     confessionInput.value = '';
                 }
-            });
 
-            // Add a simple fade-in animation for new elements
-            const style = document.createElement('style');
-            style.innerHTML = `
-                @keyframes fade-in {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fade-in {
-                    animation: fade-in 0.5s ease-out forwards;
-                }
-            `;
-            document.head.appendChild(style);
-
-            // Initial load of confessions
-            loadConfessions();
+                // Re-enable the form
+                confessionInput.disabled = false;
+                confessionForm.querySelector('button').disabled = false;
+            }
         });
-    </script>
 
-</body>
+        // LISTEN for new confessions in real-time
+        const listenForNewConfessions = () => {
+            _supabase.channel('public:confessions')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'confessions' }, payload => {
+                    // Check if the confession is already on the page before adding
+                    if (!document.querySelector(`[data-id='${payload.new.id}']`)) {
+                        addConfessionToDOM(payload.new);
+                    }
+                })
+                .subscribe();
+        };
+
+        // Add a simple fade-in animation for new elements
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes fade-in {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fade-in {
+                animation: fade-in 0.5s ease-out forwards;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Start everything!
+        fetchInitialConfessions();
+        listenForNewConfessions();
+    </script>
+    </body>
 </html>
